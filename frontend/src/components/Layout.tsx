@@ -1,5 +1,5 @@
-import React from 'react';
-import { Layout as AntLayout, Menu, Dropdown, Avatar, Space } from 'antd';
+import React, { useState } from 'react';
+import { Layout as AntLayout, Menu, Dropdown, Avatar, Space, Modal, Descriptions, Tag } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -18,6 +18,9 @@ const Layout: React.FC = () => {
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { projects } = useSelector((state: RootState) => state.projects);
+  const { currentSeismic, seismicList } = useSelector((state: RootState) => state.seismic);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const menuItems = [
     {
@@ -33,7 +36,7 @@ const Layout: React.FC = () => {
       key: 'profile',
       icon: <UserOutlined />,
       label: '个人资料',
-      onClick: () => {},
+      onClick: () => setIsProfileOpen(true),
     },
     {
       key: 'settings',
@@ -49,15 +52,32 @@ const Layout: React.FC = () => {
       icon: <LogoutOutlined />,
       label: '退出登录',
       onClick: () => {
-        dispatch(logout());
-        navigate('/login');
+        // 等待状态清理完成再跳转，确保重新进入时不会残留上一次的页面与面板
+        Promise.resolve(dispatch(logout())).then(() => {
+          navigate('/login', { replace: true });
+        });
       },
     },
   ];
 
-  const selectedKey = menuItems.find(
-    (item) => location.pathname.startsWith(item.key)
-  )?.key;
+  // 项目管理模块包含项目列表页与数据查看页，进入查看页时侧栏仍选中“项目管理”
+  const selectedKey =
+    location.pathname.startsWith('/projects') || location.pathname.startsWith('/viewer')
+      ? '/projects'
+      : undefined;
+
+  // 顶栏标题始终与当前页面内容对应
+  const isViewer = location.pathname.startsWith('/viewer/');
+  let headerTitle = '项目管理';
+  if (isViewer) {
+    const seismic =
+      currentSeismic || seismicList.find((s) => `/viewer/${s.id}` === location.pathname);
+    const project = seismic
+      ? projects.find((p) => p.id === seismic.project_id)
+      : undefined;
+    const parts = [project?.name, seismic?.name].filter(Boolean);
+    headerTitle = parts.length > 0 ? parts.join(' / ') : '数据查看';
+  }
 
   return (
     <AntLayout style={{ minHeight: '100vh' }}>
@@ -89,6 +109,16 @@ const Layout: React.FC = () => {
           <span style={{ color: 'white', fontSize: 18, fontWeight: 600 }}>
             SeismicVision
           </span>
+          <span
+            style={{
+              color: 'rgba(255,255,255,0.65)',
+              fontSize: 14,
+              borderLeft: '1px solid rgba(255,255,255,0.25)',
+              paddingLeft: 16,
+            }}
+          >
+            {headerTitle}
+          </span>
         </div>
 
         <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
@@ -113,6 +143,25 @@ const Layout: React.FC = () => {
           <Outlet />
         </Content>
       </AntLayout>
+
+      <Modal
+        title="个人资料"
+        open={isProfileOpen}
+        onCancel={() => setIsProfileOpen(false)}
+        footer={null}
+      >
+        <Descriptions column={1} bordered size="small">
+          <Descriptions.Item label="用户名">{user?.username || '-'}</Descriptions.Item>
+          <Descriptions.Item label="姓名">{user?.full_name || '-'}</Descriptions.Item>
+          <Descriptions.Item label="邮箱">{user?.email || '-'}</Descriptions.Item>
+          <Descriptions.Item label="角色">
+            {user?.is_admin ? <Tag color="red">管理员</Tag> : <Tag>普通用户</Tag>}
+          </Descriptions.Item>
+          <Descriptions.Item label="创建时间">
+            {user?.created_at ? new Date(user.created_at).toLocaleString('zh-CN') : '-'}
+          </Descriptions.Item>
+        </Descriptions>
+      </Modal>
     </AntLayout>
   );
 };

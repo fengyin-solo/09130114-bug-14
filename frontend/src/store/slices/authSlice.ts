@@ -18,6 +18,12 @@ const initialState: AuthState = {
   error: null,
 };
 
+// 始终以服务端返回的用户信息为准，并同步更新本地缓存，
+// 避免个人资料更新后顶栏仍显示旧名称。
+const persistUser = (user: User) => {
+  localStorage.setItem('user', JSON.stringify(user));
+};
+
 export const login = createAsyncThunk(
   'auth/login',
   async ({ username, password }: { username: string; password: string }, { rejectWithValue }) => {
@@ -28,7 +34,7 @@ export const login = createAsyncThunk(
 
       const userResponse = await authAPI.getCurrentUser();
       const user = userResponse.data;
-      localStorage.setItem('user', JSON.stringify(user));
+      persistUser(user);
 
       return { user, token: access_token };
     } catch (error: any) {
@@ -52,6 +58,7 @@ export const register = createAsyncThunk(
 export const getCurrentUser = createAsyncThunk('auth/getCurrentUser', async (_, { rejectWithValue }) => {
   try {
     const response = await authAPI.getCurrentUser();
+    persistUser(response.data);
     return response.data;
   } catch (error: any) {
     return rejectWithValue(error.response?.data?.detail || '获取用户信息失败');

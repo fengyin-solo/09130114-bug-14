@@ -34,6 +34,18 @@ export const fetchSeismicData = createAsyncThunk(
   }
 );
 
+export const fetchSeismicById = createAsyncThunk(
+  'seismic/fetchSeismicById',
+  async (id: number, { rejectWithValue }) => {
+    try {
+      const response = await seismicAPI.get(id);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || '获取地震数据失败');
+    }
+  }
+);
+
 export const uploadSeismicData = createAsyncThunk(
   'seismic/uploadSeismicData',
   async (
@@ -100,6 +112,15 @@ const seismicSlice = createSlice({
     clearSeismicError: (state) => {
       state.error = null;
     },
+    // 离开数据管理上下文（切换项目、返回项目列表）时清空列表，
+    // 防止其他项目的数据短暂残留。
+    clearSeismicData: (state) => {
+      state.seismicList = [];
+      state.currentSeismic = null;
+      state.uploadProgress = 0;
+      state.error = null;
+      state.loading = false;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -112,6 +133,18 @@ const seismicSlice = createSlice({
         state.seismicList = action.payload;
       })
       .addCase(fetchSeismicData.rejected, (state, action: PayloadAction<any>) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(fetchSeismicById.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchSeismicById.fulfilled, (state, action: PayloadAction<SeismicData>) => {
+        state.loading = false;
+        state.currentSeismic = action.payload;
+      })
+      .addCase(fetchSeismicById.rejected, (state, action: PayloadAction<any>) => {
         state.loading = false;
         state.error = action.payload as string;
       })
@@ -148,5 +181,6 @@ export const {
   updateAnnotation,
   removeAnnotation,
   clearSeismicError,
+  clearSeismicData,
 } = seismicSlice.actions;
 export default seismicSlice.reducer;

@@ -30,9 +30,8 @@ import {
   createProject,
   updateProject,
   deleteProject,
-  setCurrentProject,
 } from '../store/slices/projectSlice';
-import { fetchSeismicData, uploadSeismicData, setCurrentSeismic } from '../store/slices/seismicSlice';
+import { fetchSeismicData, uploadSeismicData, setCurrentSeismic, clearSeismicData } from '../store/slices/seismicSlice';
 import { RootState, AppDispatch } from '../store';
 import { Project, SeismicData } from '../types';
 
@@ -53,6 +52,13 @@ const Projects: React.FC = () => {
 
   useEffect(() => {
     dispatch(fetchProjects());
+  }, [dispatch]);
+
+  // 离开项目管理页（进入查看页）时清掉数据管理面板的残留上下文
+  useEffect(() => {
+    return () => {
+      dispatch(clearSeismicData());
+    };
   }, [dispatch]);
 
   const handleCreate = () => {
@@ -94,6 +100,8 @@ const Projects: React.FC = () => {
     setSelectedProject(project);
     uploadForm.resetFields();
     setIsUploadModalOpen(true);
+    // 先清空上一个项目的数据，再拉取当前项目的数据
+    dispatch(clearSeismicData());
     dispatch(fetchSeismicData(project.id));
   };
 
