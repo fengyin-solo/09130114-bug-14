@@ -4,7 +4,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Button, Spin, message, Space, Typography } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { RootState, AppDispatch } from '../store';
-import { fetchSeismicData, setCurrentSeismic } from '../store/slices/seismicSlice';
+import { setCurrentSeismic } from '../store/slices/seismicSlice';
+import { resetViewer } from '../store/slices/viewerSlice';
+import { seismicAPI } from '../services/api';
 import { SeismicData } from '../types';
 import SeismicCanvas from '../components/SeismicCanvas';
 import ControlPanel from '../components/ControlPanel';
@@ -19,25 +21,64 @@ const Viewer: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { seismicList, loading } = useSelector((state: RootState) => state.seismic);
+  const seismicList = useSelector((state: RootState) => state.seismic.seismicList);
   const [currentData, setCurrentData] = useState<SeismicData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // 离开查看页时重置查看器状态，下次进入恢复为初始状态
+  useEffect(() => {
+    return () => {
+      dispatch(resetViewer());
+      dispatch(setCurrentSeismic(null));
+    };
+  }, [dispatch]);
 
   useEffect(() => {
-    const loadData = async () => {
-      const id = parseInt(seismicId || '0');
-      if (!id) return;
+    let cancelled = false;
 
-      const existing = seismicList.find((s) => s.id === id);
-      if (existing) {
-        setCurrentData(existing);
-        dispatch(setCurrentSeismic(existing));
-      } else {
+    const loadData = async () => {
+      const id = parseInt(seismicId || '0', 10);
+      if (!id) {
         message.error('未找到地震数据');
         navigate('/projects');
+        return;
+      }
+
+      setLoading(true);
+      setCurrentData(null);
+
+      // 优先使用列表缓存，未命中时按路由 id 单独获取，
+      // 保证顶部显示的名称与当前查看的数据始终一致
+      const cached = seismicList.find((s) => s.id === id);
+      if (cached) {
+        setCurrentData(cached);
+        dispatch(setCurrentSeismic(cached));
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await seismicAPI.get(id);
+        if (cancelled) return;
+        setCurrentData(response.data);
+        dispatch(setCurrentSeismic(response.data));
+      } catch {
+        if (!cancelled) {
+          message.error('未找到地震数据');
+          navigate('/projects');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     loadData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [seismicId, seismicList, dispatch, navigate]);
 
   if (loading || !currentData) {

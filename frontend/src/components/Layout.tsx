@@ -48,15 +48,22 @@ const Layout: React.FC = () => {
       key: 'logout',
       icon: <LogoutOutlined />,
       label: '退出登录',
-      onClick: () => {
-        dispatch(logout());
-        navigate('/login');
+      onClick: async () => {
+        // 先等待退出完成（清空本地缓存并重置应用状态），再跳转登录页
+        await dispatch(logout());
+        navigate('/login', { replace: true });
       },
     },
   ];
 
-  const selectedKey = menuItems.find(
-    (item) => location.pathname.startsWith(item.key)
+  // 导航项与路由前缀的对应关系：数据查看页（/viewer/:id）从项目管理进入，
+  // 查看数据时侧栏仍保持“项目管理”高亮，保证选中项与当前页面一致
+  const menuMatchMap: Array<{ key: string; prefixes: string[] }> = [
+    { key: '/projects', prefixes: ['/projects', '/viewer'] },
+  ];
+
+  const selectedKey = menuMatchMap.find((entry) =>
+    entry.prefixes.some((prefix) => location.pathname.startsWith(prefix))
   )?.key;
 
   return (

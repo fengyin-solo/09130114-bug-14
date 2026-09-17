@@ -10,8 +10,18 @@ interface AuthState {
   error: string | null;
 }
 
+const getStoredUser = (): User | null => {
+  try {
+    const stored = localStorage.getItem('user');
+    return stored ? (JSON.parse(stored) as User) : null;
+  } catch {
+    localStorage.removeItem('user');
+    return null;
+  }
+};
+
 const initialState: AuthState = {
-  user: null,
+  user: getStoredUser(),
   token: localStorage.getItem('token'),
   isAuthenticated: !!localStorage.getItem('token'),
   loading: false,
@@ -52,6 +62,7 @@ export const register = createAsyncThunk(
 export const getCurrentUser = createAsyncThunk('auth/getCurrentUser', async (_, { rejectWithValue }) => {
   try {
     const response = await authAPI.getCurrentUser();
+    localStorage.setItem('user', JSON.stringify(response.data));
     return response.data;
   } catch (error: any) {
     return rejectWithValue(error.response?.data?.detail || '获取用户信息失败');

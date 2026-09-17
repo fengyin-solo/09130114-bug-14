@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { RootState } from './store';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState, AppDispatch } from './store';
+import { getCurrentUser } from './store/slices/authSlice';
 import Login from './pages/Login';
 import Projects from './pages/Projects';
 import Viewer from './pages/Viewer';
@@ -13,6 +14,17 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 };
 
 const App: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+
+  // 进入应用且处于登录状态时，同步一次最新用户信息，
+  // 保证顶栏个人资料名称与当前登录账号一致
+  useEffect(() => {
+    if (isAuthenticated) {
+      dispatch(getCurrentUser());
+    }
+  }, [dispatch, isAuthenticated]);
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
